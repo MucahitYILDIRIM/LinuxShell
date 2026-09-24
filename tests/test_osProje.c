@@ -416,6 +416,77 @@ void test_execPipe_multiLineData(void)
         TEST_ASSERT_EQUAL_STRING("a\nb\nc\n", out);
 }
 
+/* ---------- welcomeScreen ---------- */
+
+void test_welcomeScreen_printsBanner(void)
+{
+        captureStart();
+        welcomeScreen();
+        const char *out = captureStop();
+        TEST_ASSERT_NOT_NULL(strstr(out, "C Shell"));
+}
+
+/* ---------- PromptBas ---------- */
+
+void test_PromptBas_containsHostnameCwdAndColorCodes(void)
+{
+        char hostn[1204] = "";
+        gethostname(hostn, sizeof(hostn));
+        char cwd[1024];
+        getcwd(cwd, sizeof(cwd));
+
+        captureStart();
+        PromptBas();
+        const char *out = captureStop();
+
+        TEST_ASSERT_NOT_NULL(strstr(out, hostn));
+        TEST_ASSERT_NOT_NULL(strstr(out, cwd));
+        TEST_ASSERT_NOT_NULL(strstr(out, GRN));
+        TEST_ASSERT_NOT_NULL(strstr(out, BLU));
+        TEST_ASSERT_NOT_NULL(strstr(out, RESET));
+        TEST_ASSERT_EQUAL_CHAR('>', out[strlen(out) - 1]);
+
+        const char *logname = getenv("LOGNAME");
+        if (logname != NULL)
+        {
+                TEST_ASSERT_NOT_NULL(strstr(out, logname));
+        }
+}
+
+/* ---------- program_quit ---------- */
+
+/* program_quit exit(0) cagirdigi icin ayri bir process icinde test edildi;
+   torun surecin dosyaya yazmasi program_quit donmeden ONCE gerceklesmis olmali. */
+void test_program_quit_waitsForChildrenThenExitsZero(void)
+{
+        /* program_quit() basarili exit() cagirir; stdio tamponu bosaltilip
+           stdout gecici dosyaya yonlendirildikten SONRA fork edildi, aksi halde
+           cocuk exit() sirasinda ana surecin henuz yazdirilmamis (buffered)
+           test ciktisini tekrar basardi. */
+        captureStart();
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+                pid_t grandchild = fork();
+                if (grandchild == 0)
+                {
+                        usleep(200000);
+                        writeFile(tmpPath, "done");
+                        _exit(0);
+                }
+                program_quit();
+                _exit(1); // program_quit exit(0) ile cikmali, buraya ulasilmamali
+        }
+
+        int status;
+        waitpid(pid, &status, 0);
+        captureStop();
+
+        TEST_ASSERT_TRUE(WIFEXITED(status));
+        TEST_ASSERT_EQUAL_INT(0, WEXITSTATUS(status));
+        TEST_ASSERT_EQUAL_STRING("done", readFile(tmpPath));
+}
+
 int main(void)
 {
         UNITY_BEGIN();
@@ -459,6 +530,12 @@ int main(void)
 
         RUN_TEST(test_execPipe_twoCommands);
         RUN_TEST(test_execPipe_multiLineData);
+
+        RUN_TEST(test_welcomeScreen_printsBanner);
+
+        RUN_TEST(test_PromptBas_containsHostnameCwdAndColorCodes);
+
+        RUN_TEST(test_program_quit_waitsForChildrenThenExitsZero);
 
         return UNITY_END();
 }

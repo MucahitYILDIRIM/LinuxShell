@@ -1,5 +1,57 @@
 # CHANGES
 
+## Kapsam incelemesi ve eksik testlerin tamamlanmasi (2026-09-24)
+
+Mevcut test dosyasi (`tests/test_osProje.c`, 31 test) `osProje.c` icindeki tum
+statik yardimci fonksiyonlari (`isPipe`, `tokenizeLine`, `parseRedirection`,
+`parseBackground`, `singleProccessing`, `singleProccessingBg`, `bgHandlerControl`,
+`inputProcessing`, `outputProcessing`, `execPipe`) kapsiyordu. Kapsam
+incelemesinde `osProje.c` icindeki asagidaki fonksiyonlarin test edilmedigi
+tespit edildi ve testleri eklendi (34 test, 0 hata):
+
+- **`welcomeScreen()`** – karsilama banner'inin basildigi dogrulandi
+  (`test_welcomeScreen_printsBanner`).
+- **`PromptBas()`** – ciktinin hostname, `getcwd()` sonucu, ANSI renk kodlari
+  (`GRN`/`BLU`/`RESET`) ve sondaki `>` karakterini icerdigi dogrulandi; `LOGNAME`
+  ortam degiskeni tanimliysa kullanici adinin da ciktida yer aldigi kontrol edildi
+  (`test_PromptBas_containsHostnameCwdAndColorCodes`).
+- **`program_quit()`** – `exit(0)` cagirdigi icin ayri bir process'te (fork)
+  calistirildi; bir torun surecin islemini bitirip dosyaya yazmasi beklenip,
+  `program_quit`in bu torun sureci topladiktan SONRA cikis kodu 0 ile
+  sonlandigi dogrulandi (`test_program_quit_waitsForChildrenThenExitsZero`).
+
+### Karsilasilan ve duzeltilen test hatasi (davranis degisikligi degil)
+`program_quit()` testinde ilk denemede, `make test | tail` gibi ciktinin bir
+boruya yonlendirildigi durumlarda stdout'un tam tamponlu (fully buffered)
+oldugu, `fork()` oncesi tampon bosaltilmadigi icin `program_quit()` icindeki
+`exit(0)` cagrisinin cocuk surecte ana surecin henuz yazdirilmamis Unity test
+ciktisini tekrar bastirdigi gozlemlendi (yinelenen "PASS" satiri). Diger
+fork tabanli testlerdeki gibi `captureStart()` (once `fflush(stdout)` yapip
+stdout'u gecici dosyaya yonlendiriyor) `fork()`tan ONCE cagrilarak duzeltildi;
+bu, uretim kodunda (`osProje.c`) herhangi bir degisiklik gerektirmedi, sadece
+test izolasyonuyla ilgiliydi. 15 ardisik calistirmada kararlilik dogrulandi.
+
+### `main()` bilerek test disi birakildi
+`main()` icindeki tum saf ayristirma mantigi zaten `tokenizeLine`,
+`parseRedirection`, `parseBackground` fonksiyonlarina cikarilmis ve test
+edilmis durumda. Geriye kalan `main()` govdesi stdin'den okuyan sonsuz bir
+REPL dongusu ve `quit` disinda cikis yolu olmayan interaktif bir yapi; bunu
+unit test etmek icin ya derlenmis binary'yi ayri bir surecte calistirip
+stdin/stdout'unu kontrol eden bir entegrasyon testi (senkronizasyon ve
+zamanlama riski yuksek, mevcut testlerin kapsadigi mantigi tekrar test eder)
+ya da davranisi degistiren daha buyuk bir refactor gerekirdi. Kural 2 geregi
+sadece gerekli oldugu kadar kucuk refactor yapilmasi istendiginden ve
+`main()`in tum alt-mantigi zaten birim test kapsaminda oldugundan, `main()`
+oldugu gibi (`#ifndef UNIT_TEST` ile testten izole) birakildi.
+
+### Ortam
+macOS (Darwin 25.6, Apple clang) uzerinde derlendi ve calistirildi: **34 test,
+0 hata**; kararsizlik kontrolu icin 15 kez tekrar calistirildi, hepsi gecti.
+Linux'ta calistirilmadi; kullanilan API'ler (POSIX `gethostname`, `getcwd`,
+`waitpid`) Linux'ta da mevcut.
+
+---
+
 ## Unit testler eklendi
 
 ### Kararlar
