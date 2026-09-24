@@ -274,7 +274,57 @@ int program_quit()
     exit(0);
 }
 
+int tokenizeLine(char *line, char **tokens) // komut satiri tokenlere ayrildi, token sayisi dondu
+{
+        if((tokens[0] = strtok(line," \n\t")) == NULL) return 0;
+        int numTokens = 1;
+        while((tokens[numTokens] = strtok(NULL, " \n\t")) != NULL) numTokens++;
+        return numTokens;
+}
 
+int parseRedirection(char **command, char **args, int *counterOut) // 0: yok, 1: '<', 2: '>'
+{
+        int status = 0;
+        int counter = 0;
+        while(command[counter] != NULL)
+        {
+                if (strcmp(command[counter],"<") == 0) // giris yonlendirme islemi algilandi
+                {
+                        status=1;
+                        break;
+                }
+                else if (strcmp(command[counter],">") == 0) // cikis yonlendirme islemi algilandi
+                {
+                        status=2;
+                        break;
+                }
+                args[counter] = command[counter];
+                counter++;
+        }
+        args[counter]=NULL;
+        *counterOut = counter;
+        return status;
+}
+
+int parseBackground(char **args, char **command) // '&' varsa 1 dondu, oncesi command'a kopyalandi
+{
+        int backgroundBg = 0;
+        int jBg = 0;
+        while(args[jBg] != NULL) //arkaplan kontrolu
+        {
+                if (strcmp(args[jBg],"&") == 0)
+                {
+                        backgroundBg=1;
+                        break;
+                }
+                command[jBg] = args[jBg];
+                jBg++;
+        }
+        command[jBg]=NULL;
+        return backgroundBg;
+}
+
+#ifndef UNIT_TEST
 int main (int argc, char **argv, char **envp)
 {
         welcomeScreen();
@@ -288,9 +338,7 @@ int main (int argc, char **argv, char **envp)
                 PromptBas();
                 memset(line, '\0',MAXLINE);
                 fgets(line,MAXLINE,stdin); // komut alindi
-                if((tokens[0] = strtok(line," \n\t")) == NULL) continue; //komut tokenlere ayrildi
-                numTokens = 1; 
-                while((tokens[numTokens] = strtok(NULL, " \n\t")) != NULL) numTokens++; 
+                if((numTokens = tokenizeLine(line, tokens)) == 0) continue; //komut tokenlere ayrildi
                 int status=0;
                 if(strcmp(tokens[0],"quit") == 0) // quit  komutu ile cikis saglandi
                 {
@@ -336,25 +384,8 @@ int main (int argc, char **argv, char **envp)
                                 }
                                 else
                                 {
-                                        status = 0;
                                         int counter = 0;
-                                        while(executableCommand[counter] != NULL)
-                                        {
-                                                if (strcmp(executableCommand[counter],"<") == 0) // giris yonlendirme islemi algilandi
-                                                {
-                                                        status=1;
-                                                        break;
-                                                        
-                                                }
-                                                else if (strcmp(executableCommand[counter],">") == 0) // cikis yonlendirme islemi algilandi
-                                                {
-                                                        status=2;
-                                                        break;
-                                                }
-                                                temp[counter] = executableCommand[counter];
-                                                counter++;
-                                        }
-                                        temp[counter]=NULL;
+                                        status = parseRedirection(executableCommand, temp, &counter);
 
                                         if(status==1)
                                         {
@@ -367,22 +398,8 @@ int main (int argc, char **argv, char **envp)
                                         }
                                         else
                                         {
-                                                backgroundBg =0; 
                                                 char *tempBg[256];
-                                                int jBg = 0;
-
-                                                while(temp[jBg] != NULL) //arkaplan kontrolu
-                                                {
-                                                        if (strcmp(temp[jBg],"&") == 0)
-                                                        {
-                                                                backgroundBg=1;
-                                                                break;
-                                                                
-                                                        }
-                                                        tempBg[jBg] = temp[jBg];
-                                                        jBg++;
-                                                }
-                                                tempBg[jBg]=NULL;
+                                                backgroundBg = parseBackground(temp, tempBg);
                                                 singleProccessing(tempBg,backgroundBg);
                                         }
 
@@ -401,3 +418,4 @@ int main (int argc, char **argv, char **envp)
                 } 
         }
 }
+#endif
